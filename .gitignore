@@ -1,0 +1,41 @@
+﻿# Entorno virtual
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs y datos generados
+*.log
+logs/
+exports/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Cobertura de tests
+.coverage
+htmlcov/
