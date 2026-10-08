@@ -1,6 +1,6 @@
 import pytest
 
-from codigo.frontend.mensajes_voz import crear_mensaje, texto_para_voz
+from codigo.legacy.streamlit.mensajes_voz import crear_mensaje, texto_para_voz
 
 
 @pytest.mark.parametrize(

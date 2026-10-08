@@ -9,7 +9,7 @@ import streamlit as st
 from apoyo_voz import mostrar_apoyo_voz
 from mensajes_voz import crear_mensaje
 
-RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
+RAIZ_PROYECTO = Path(__file__).resolve().parents[3]
 RUTA_ESCENARIOS = RAIZ_PROYECTO / "datos" / "escenarios.json"
 
 COLUMNAS_MATRIZ = 3

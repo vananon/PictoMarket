@@ -4,6 +4,8 @@ venv/
 env/
 
 # Python
+.pytest_cache/
+.ruff_cache/
 __pycache__/
 *.py[cod]
 *.pyo
@@ -39,3 +41,10 @@ exports/
 # Cobertura de tests
 .coverage
 htmlcov/
+
+# React / Vite y pruebas del navegador
+node_modules/
+.vite/
+artifacts/
+playwright-report/
+test-results/

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import render, { createSpeechController, spanishVoices } from "../codigo/frontend/apoyo_voz.mjs";
+import render, { createSpeechController, spanishVoices } from "../apoyo_voz.mjs";
 
 const local = { name: "Español local", lang: "es-PE", voiceURI: "es-pe", localService: true };
 const remote = { name: "Español en línea", lang: "es-MX", voiceURI: "es-mx", localService: false };

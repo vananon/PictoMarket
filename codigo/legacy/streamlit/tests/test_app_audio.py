@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-APP = Path(__file__).resolve().parents[1] / "codigo/frontend/app_pictomarket.py"
+APP = Path(__file__).resolve().parents[1] / "app_pictomarket.py"
 
 
 @pytest.fixture
