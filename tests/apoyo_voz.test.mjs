@@ -201,6 +201,8 @@ test("no hablar mientras la pestaña está oculta", () => {
   visible = false;
   controller.update(next);
   assert.equal(synth.spoken.length, 1);
+  assert.equal(controller.snapshot().status.code, "stopped");
+  assert.equal(controller.snapshot().status.message_id, next.id);
   visible = true;
   controller.repeat();
   assert.equal(synth.spoken.at(-1).text, next.text);
@@ -284,9 +286,12 @@ test("las voces que aparecen después actualizan el selector", async () => {
 });
 
 test("navegador sin soporte muestra una alternativa visual", async () => {
-  const { root, component, elements } = domSetup(false);
+  const { root, component, elements, document } = domSetup(false);
   const cleanup = render(component);
   assert.equal(elements.get("#activar").disabled, true);
+  assert.match(elements.get("#estado").textContent, /pictogramas y el texto/);
+  document.hidden = true;
+  document.listeners.get("visibilitychange")();
   assert.match(elements.get("#estado").textContent, /pictogramas y el texto/);
   root.isConnected = false;
   cleanup();

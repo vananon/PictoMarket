@@ -507,7 +507,6 @@ st.markdown(css_dinamico(), unsafe_allow_html=True)
 
 reto_actual = RETOS[st.session_state.reto_idx]
 barra_superior(reto_actual)
-mostrar_apoyo_voz(st.session_state.mensaje)
 
 col_juego, col_lateral = st.columns([3.2, 1], gap="medium")
 
@@ -527,3 +526,6 @@ with col_lateral:
 st.markdown("<p style='text-align:center;font-size:12px;margin-top:10px'>Pictogramas: Sergio Palao. "
             "Origen: ARASAAC (arasaac.org). Licencia CC BY-NC-SA. Propiedad: Gobierno de Aragón.</p>",
             unsafe_allow_html=True)
+
+# Al final de la página para no empujar el juego hacia abajo.
+mostrar_apoyo_voz(st.session_state.mensaje)
