@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 
 import streamlit as st
+from apoyo_voz import mostrar_apoyo_voz
+from mensajes_voz import crear_mensaje
 
 RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
 RUTA_ESCENARIOS = RAIZ_PROYECTO / "datos" / "escenarios.json"
@@ -18,9 +20,12 @@ st.set_page_config(page_title="PictoMarket", page_icon="🛒", layout="wide",
 
 @st.cache_data
 def cargar_datos(ruta: Path) -> dict:
-    with open(ruta, encoding="utf-8") as f:
-        datos = json.load(f)
-    datos["catalogo"] = {int(k): v for k, v in datos["catalogo"].items()}
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.load(f)
+        datos["catalogo"] = {int(k): v for k, v in datos["catalogo"].items()}
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"No se pudieron cargar los escenarios de {ruta}") from exc
     return datos
 
 DATOS = cargar_datos(RUTA_ESCENARIOS)
@@ -53,10 +58,11 @@ def iniciar_reto(indice: int) -> None:
     ss.celebrado = False
     ss.t_ultimo_evento = time.time()
     ss.log_eventos = []
-    ss.mensaje = {"tipo": "inicio",
-                  "texto": f"¡HOLA! VAMOS A {' '.join(palabras_objetivo(reto))}. "
-                           f"BUSCA: {CATALOGO[ss.items_restantes[0]]['nombre']}",
-                  "hablar": True, "sonido": None, "id": time.time()}
+    ss.mensaje = crear_mensaje(
+        "inicio",
+        f"¡HOLA! VAMOS A {' '.join(palabras_objetivo(reto))}. "
+        f"BUSCA: {CATALOGO[ss.items_restantes[0]]['nombre']}",
+    )
 
 def estado_actual() -> dict:
     ss = st.session_state
@@ -67,12 +73,16 @@ def estado_actual() -> dict:
         "nivel_pista": ss.nivel_pista,
     }
 
-def item_objetivo():
+def item_objetivo() -> int | None:
     ss = st.session_state
     return ss.items_restantes[0] if ss.items_restantes else None
 
 if "reto_idx" not in st.session_state:
     iniciar_reto(0)
+elif "id" not in st.session_state.mensaje:
+    # Compatibilidad con sesiones abiertas antes de añadir el apoyo de voz.
+    anterior = st.session_state.mensaje
+    st.session_state.mensaje = crear_mensaje(anterior["tipo"], anterior["texto"])
 
 def politica_agente(estado: dict, producto_tocado: int, reto: dict) -> str:
     if producto_tocado in estado["items_restantes"]:
@@ -101,6 +111,8 @@ def al_tocar_producto(producto: int) -> None:
     reto = RETOS[ss.reto_idx]
     s_antes = estado_actual()
     objetivo = item_objetivo()
+    if objetivo is None:
+        return
     h_antes = entropia_visual(len(ss.productos_visibles))
 
     ahora = time.time()
@@ -118,10 +130,12 @@ def al_tocar_producto(producto: int) -> None:
         ss.intentos_fallidos = 0
         ss.nivel_pista = 0
         sig = item_objetivo()
-        ss.mensaje = {"tipo": "exito",
-                      "texto": f"¡MUY BIEN! {nombre} VA AL CARRITO."
-                               + (f" AHORA BUSCA: {CATALOGO[sig]['nombre']}" if sig else ""),
-                      "hablar": True, "sonido": "exito", "id": time.time()}
+        ss.mensaje = crear_mensaje(
+            "exito",
+            f"¡MUY BIEN! {nombre} VA AL CARRITO."
+            + (f" AHORA BUSCA: {CATALOGO[sig]['nombre']}" if sig
+               else " ¡LO LOGRASTE! COMPRASTE TODO."),
+        )
     else:
         ss.intentos_fallidos += 1
         ss.errores_totales += 1
@@ -137,10 +151,10 @@ def al_tocar_producto(producto: int) -> None:
 
         textos = {
             "a1": f"{nombre} NO ESTÁ EN LA LISTA. BUSCA EN {cat['icono']} {cat['nombre']}",
-            "a2": f"QUITÉ UN PRODUCTO PARA AYUDARTE. ¡TÚ PUEDES!",
+            "a2": "QUITÉ UN PRODUCTO PARA AYUDARTE. ¡TÚ PUEDES!",
             "a3": f"MIRA 👉 AQUÍ ESTÁ {CATALOGO[objetivo]['nombre']}",
         }
-        ss.mensaje = {"tipo": "pista", "texto": textos[accion], "hablar": True, "sonido": "error", "id": time.time()}
+        ss.mensaje = crear_mensaje("pista", textos[accion])
 
     ss.log_eventos.append({
         "escenario_id": reto["id_reto"],
@@ -428,13 +442,13 @@ def tarjeta_producto(producto: int) -> None:
             f"  </div>"
             f"</div>", unsafe_allow_html=True)
         st.button(info["nombre"], key=f"btn_{producto}", on_click=al_tocar_producto,
-                  args=(producto,), disabled=en_carrito, use_container_width=True)
+                  args=(producto,), disabled=en_carrito, width="stretch")
 
 def matriz_productos() -> None:
     visibles = st.session_state.productos_visibles
     for inicio in range(0, len(visibles), COLUMNAS_MATRIZ):
         cols = st.columns(COLUMNAS_MATRIZ, gap="large")
-        for col, producto in zip(cols, visibles[inicio:inicio + COLUMNAS_MATRIZ]):
+        for col, producto in zip(cols, visibles[inicio:inicio + COLUMNAS_MATRIZ], strict=False):
             with col:
                 tarjeta_producto(producto)
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
@@ -472,7 +486,7 @@ def pantalla_final(reto: dict) -> None:
                 f"<div class='fila'>{fotos}</div></div>", unsafe_allow_html=True)
     siguiente = (ss.reto_idx + 1) % len(RETOS)
     st.button("OTRA COMPRA", key="btn_siguiente", on_click=iniciar_reto,
-              args=(siguiente,), use_container_width=True)
+              args=(siguiente,), width="stretch")
 
 def panel_terapeuta() -> None:
     ss = st.session_state
@@ -513,119 +527,5 @@ st.markdown("<p style='text-align:center;font-size:12px;margin-top:10px'>Pictogr
             "Origen: ARASAAC (arasaac.org). Licencia CC BY-NC-SA. Propiedad: Gobierno de Aragón.</p>",
             unsafe_allow_html=True)
 
-def inyectar_js_audio():
-    import base64
-    import json
-    
-    ss = st.session_state
-    if "mensaje" not in ss:
-        return
-        
-    m = ss.mensaje
-    m_json = json.dumps({
-        "texto": m.get("texto", ""),
-        "hablar": m.get("hablar", False),
-        "sonido": m.get("sonido"),
-        "id": m.get("id", 0)
-    })
-    
-    raw_js = f"""
-    const win = window;
-    const doc = win.document;
-    const msg = {m_json};
-
-    function hablar(texto) {{
-        if ('speechSynthesis' in win) {{
-            win.speechSynthesis.cancel();
-            let u = new win.SpeechSynthesisUtterance(texto);
-            
-            let voices = win.speechSynthesis.getVoices();
-            let friendlyVoice = voices.find(v => v.name.includes("Google español") || v.name.includes("Google Spanish")) ||
-                                voices.find(v => (v.name.includes("Sabina") || v.name.includes("Paulina") || v.name.includes("Laura") || v.name.includes("Mia") || v.name.includes("Helena") || v.name.includes("Monica")) && v.lang.includes("es")) ||
-                                voices.find(v => v.lang.startsWith("es"));
-            
-            if (friendlyVoice) {{
-                u.voice = friendlyVoice;
-            }} else {{
-                u.lang = 'es-ES';
-            }}
-            
-            u.rate = 0.9;
-            u.pitch = 1.35; 
-            win.speechSynthesis.speak(u);
-        }}
-    }}
-
-    function playSuccessSound() {{
-        try {{
-            const ctx = new (win.AudioContext || win.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-            osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
-            osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2);
-            osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.3);
-            
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-            
-            osc.start();
-            osc.stop(ctx.currentTime + 0.6);
-        }} catch (e) {{}}
-    }}
-
-    function playErrorSound() {{
-        try {{
-            const ctx = new (win.AudioContext || win.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(200, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.3);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.3);
-        }} catch (e) {{}}
-    }}
-
-    if (win.lastMsgId !== msg.id) {{
-        win.lastMsgId = msg.id;
-        
-        if (msg.sonido === "exito") playSuccessSound();
-        else if (msg.sonido === "error") playErrorSound();
-        
-        if (msg.hablar && msg.texto) {{
-            if (win.speechSynthesis.getVoices().length === 0) {{
-                win.speechSynthesis.onvoiceschanged = () => hablar(msg.texto);
-            }} else {{
-                setTimeout(() => hablar(msg.texto), msg.sonido ? 400 : 50);
-            }}
-        }}
-    }}
-
-    if (!win.hoverIntervalSet) {{
-        win.hoverIntervalSet = true;
-        setInterval(() => {{
-            const minis = doc.querySelectorAll('.pm-mini:not([data-hover-binded="true"])');
-            minis.forEach(el => {{
-                el.setAttribute("data-hover-binded", "true");
-                el.addEventListener('mouseenter', () => {{
-                    let texto = el.querySelector('.t')?.innerText;
-                    if (texto) hablar(texto);
-                }});
-            }});
-        }}, 1000);
-    }}
-    """
-    
-    b64 = base64.b64encode(raw_js.encode('utf-8')).decode('utf-8')
-    st.markdown(f'<img src="x" onerror="eval(atob(\'{b64}\'))" style="display:none;">', unsafe_allow_html=True)
-
-inyectar_js_audio()
+# Al final de la página para no empujar el juego hacia abajo.
+mostrar_apoyo_voz(st.session_state.mensaje)

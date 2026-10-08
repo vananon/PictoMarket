@@ -15,7 +15,9 @@
 4. [Estructura del proyecto](#-estructura-del-proyecto)
 5. [Descripción de escenarios](#-descripción-de-escenarios)
 6. [Panel del terapeuta](#-panel-del-terapeuta)
-7. [Tecnologías utilizadas](#-tecnologías-utilizadas)
+7. [Apoyo de voz](#-apoyo-de-voz)
+8. [Pruebas](#-pruebas)
+9. [Tecnologías utilizadas](#-tecnologías-utilizadas)
 
 ---
 
@@ -23,7 +25,9 @@
 
 | Herramienta | Versión mínima | Notas |
 |---|---|---|
-| Python | 3.9+ | Recomendado 3.11 o superior |
+| Python | 3.10+ | Recomendado 3.11 o superior |
+| Streamlit | 1.57+ (< 2) | Incluye los componentes v2 usados por el audio |
+| Navegador | Actualizado | Chrome o Edge con una voz en español |
 | pip | Incluido con Python | Gestor de paquetes |
 | Conexión a internet | — | Para cargar pictogramas desde ARASAAC |
 
@@ -91,11 +95,16 @@ PictoMarket/
 │
 ├── codigo/
 │   └── frontend/
-│       └── app_pictomarket.py      # Aplicación principal (Streamlit)
+│       ├── app_pictomarket.py      # Aplicación principal (Streamlit)
+│       ├── mensajes_voz.py          # Mensajes identificados y texto para voz
+│       ├── apoyo_voz.py             # Componente Streamlit v2
+│       └── apoyo_voz.mjs            # Síntesis y controles en el navegador
 │
 ├── datos/
 │   └── escenarios.json             # Catálogo de productos, categorías y retos
 │
+├── tests/                          # Pruebas Python y del controlador de voz
+├── pytest.ini                      # Configuración de pruebas
 ├── venv/                           # Entorno virtual (no se sube al repo)
 ├── .gitignore                      # Archivos y carpetas ignorados por Git
 ├── requirements.txt                # Dependencias de producción
@@ -107,7 +116,9 @@ PictoMarket/
 
 | Archivo | Descripción |
 |---|---|
-| `codigo/frontend/app_pictomarket.py` | Lógica completa de la app: UI, agente pedagógico, registro de eventos |
+| `codigo/frontend/app_pictomarket.py` | UI, política pedagógica por reglas y eventos del juego |
+| `codigo/frontend/mensajes_voz.py` | Contrato `id`, `tipo`, `texto`, `texto_voz`; elimina emojis del texto hablado |
+| `codigo/frontend/apoyo_voz.py` y `.mjs` | Apoyo de voz, preferencias y control de reproducción |
 | `datos/escenarios.json` | Datos del catálogo ARASAAC, categorías, presupuestos y retos de compra |
 | `.streamlit/config.toml` | Puerto, modo headless y tema base de Streamlit |
 | `requirements.txt` | Dependencia única de producción: `streamlit` |
@@ -172,14 +183,47 @@ El agente sigue una política de 4 acciones según el número de intentos fallid
 
 ---
 
+## 🔊 Apoyo de voz
+
+El audio acompaña la instrucción inicial, las pistas, los aciertos, el siguiente producto y la compra completada. **Esta fase es de frontend:** no añade FastAPI, ID3, Q-Learning ni reconocimiento de voz.
+
+1. Pulsa **Activar voz**. La primera carga permanece en silencio para respetar los permisos del navegador.
+2. **Repetir instrucción** vuelve a leer el mensaje actual; **Detener** interrumpe la lectura y **Silenciar voz** desactiva las siguientes lecturas.
+3. En **Ajustes de voz**, elige una voz española, velocidad y volumen. Se conservan al cambiar de escenario dentro de la misma sesión; una recarga o nueva instancia requiere activar otra vez.
+
+Se utiliza `speechSynthesis` (Web Speech API) en el dispositivo del jugador, sin claves ni micrófono. Se prefieren voces locales; las voces **«en línea»** pueden necesitar internet y utilizar servicios del proveedor del navegador. No se garantiza funcionamiento offline ni la misma voz en todos los dispositivos. Si no hay voces españolas, instala una desde el sistema operativo o prueba otro navegador. La app mantiene los pictogramas y el texto si la síntesis no está disponible o falla.
+
+Cada mensaje nuevo tiene un ID propio. Los reruns no lo vuelven a reproducir; una decisión nueva cancela la frase anterior y no acumula una cola de instrucciones. Ocultar la pestaña detiene la voz; al volver se puede repetir. Los cambios de ajustes no reinician la lectura automáticamente.
+
+El último estado de reproducción y las preferencias se conservan en `st.session_state["apoyo_voz"]`. No se persisten en una base de datos ni se corrige aún `t_ms` para descontar tiempo de audio: esa medición y la regla de inactividad corresponden a la fase posterior del backend/agente.
+
+---
+
+## 🧪 Pruebas
+
+Desde la raíz y con el entorno virtual activado:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+node --test tests/apoyo_voz.test.mjs
+```
+
+Node.js 22+ se usa **solo para las pruebas JavaScript**, no para ejecutar la app. Las pruebas Python verifican mensajes, reruns, pistas, compras, finalización y reinicio con `AppTest`. Las pruebas JavaScript simulan el motor de voz y comprueban activación, repetición, cancelación, errores, permisos, voces tardías y limpieza del componente; **no prueban que salga sonido por los altavoces**.
+
+Comprobación manual en el dispositivo de uso: activar voz, provocar las tres pistas, completar una compra y reiniciar. Confirmar que cada nueva instrucción se escucha una vez, que repetir funciona, que silenciar interrumpe y que cambiar ajustes no altera el carrito ni vuelve a leer solo. Revisar también volumen, pronunciación de los productos y ausencia de voz al abrir la página.
+
+---
+
 ## 🛠️ Tecnologías utilizadas
 
 | Tecnología | Uso |
 |---|---|
-| [Python 3.9+](https://www.python.org/) | Lenguaje principal |
+| [Python 3.10+](https://www.python.org/) | Lenguaje principal |
 | [Streamlit](https://streamlit.io/) | Framework de interfaz web |
 | [ARASAAC API](https://arasaac.org/developers/api) | Pictogramas (CC BY-NC-SA) |
 | HTML / CSS | Personalización visual de la interfaz |
+| Web Speech API + Streamlit Components v2 | Síntesis de voz en español y controles accesibles |
 | Google Fonts — Atkinson Hyperlegible | Tipografía de alta legibilidad |
 
 ---
