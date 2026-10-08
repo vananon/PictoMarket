@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 
 import streamlit as st
+from apoyo_voz import mostrar_apoyo_voz
+from mensajes_voz import crear_mensaje
 
 RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
 RUTA_ESCENARIOS = RAIZ_PROYECTO / "datos" / "escenarios.json"
@@ -18,9 +20,12 @@ st.set_page_config(page_title="PictoMarket", page_icon="🛒", layout="wide",
 
 @st.cache_data
 def cargar_datos(ruta: Path) -> dict:
-    with open(ruta, encoding="utf-8") as f:
-        datos = json.load(f)
-    datos["catalogo"] = {int(k): v for k, v in datos["catalogo"].items()}
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.load(f)
+        datos["catalogo"] = {int(k): v for k, v in datos["catalogo"].items()}
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"No se pudieron cargar los escenarios de {ruta}") from exc
     return datos
 
 DATOS = cargar_datos(RUTA_ESCENARIOS)
@@ -53,9 +58,11 @@ def iniciar_reto(indice: int) -> None:
     ss.celebrado = False
     ss.t_ultimo_evento = time.time()
     ss.log_eventos = []
-    ss.mensaje = {"tipo": "inicio",
-                  "texto": f"¡HOLA! VAMOS A {' '.join(palabras_objetivo(reto))}. "
-                           f"BUSCA: {CATALOGO[ss.items_restantes[0]]['nombre']}"}
+    ss.mensaje = crear_mensaje(
+        "inicio",
+        f"¡HOLA! VAMOS A {' '.join(palabras_objetivo(reto))}. "
+        f"BUSCA: {CATALOGO[ss.items_restantes[0]]['nombre']}",
+    )
 
 def estado_actual() -> dict:
     ss = st.session_state
@@ -66,12 +73,16 @@ def estado_actual() -> dict:
         "nivel_pista": ss.nivel_pista,
     }
 
-def item_objetivo():
+def item_objetivo() -> int | None:
     ss = st.session_state
     return ss.items_restantes[0] if ss.items_restantes else None
 
 if "reto_idx" not in st.session_state:
     iniciar_reto(0)
+elif "id" not in st.session_state.mensaje:
+    # Compatibilidad con sesiones abiertas antes de añadir el apoyo de voz.
+    anterior = st.session_state.mensaje
+    st.session_state.mensaje = crear_mensaje(anterior["tipo"], anterior["texto"])
 
 def politica_agente(estado: dict, producto_tocado: int, reto: dict) -> str:
     if producto_tocado in estado["items_restantes"]:
@@ -100,6 +111,8 @@ def al_tocar_producto(producto: int) -> None:
     reto = RETOS[ss.reto_idx]
     s_antes = estado_actual()
     objetivo = item_objetivo()
+    if objetivo is None:
+        return
     h_antes = entropia_visual(len(ss.productos_visibles))
 
     ahora = time.time()
@@ -117,9 +130,12 @@ def al_tocar_producto(producto: int) -> None:
         ss.intentos_fallidos = 0
         ss.nivel_pista = 0
         sig = item_objetivo()
-        ss.mensaje = {"tipo": "exito",
-                      "texto": f"¡MUY BIEN! {nombre} VA AL CARRITO."
-                               + (f" AHORA BUSCA: {CATALOGO[sig]['nombre']}" if sig else "")}
+        ss.mensaje = crear_mensaje(
+            "exito",
+            f"¡MUY BIEN! {nombre} VA AL CARRITO."
+            + (f" AHORA BUSCA: {CATALOGO[sig]['nombre']}" if sig
+               else " ¡LO LOGRASTE! COMPRASTE TODO."),
+        )
     else:
         ss.intentos_fallidos += 1
         ss.errores_totales += 1
@@ -135,10 +151,10 @@ def al_tocar_producto(producto: int) -> None:
 
         textos = {
             "a1": f"{nombre} NO ESTÁ EN LA LISTA. BUSCA EN {cat['icono']} {cat['nombre']}",
-            "a2": f"QUITÉ UN PRODUCTO PARA AYUDARTE. ¡TÚ PUEDES!",
+            "a2": "QUITÉ UN PRODUCTO PARA AYUDARTE. ¡TÚ PUEDES!",
             "a3": f"MIRA 👉 AQUÍ ESTÁ {CATALOGO[objetivo]['nombre']}",
         }
-        ss.mensaje = {"tipo": "pista", "texto": textos[accion]}
+        ss.mensaje = crear_mensaje("pista", textos[accion])
 
     ss.log_eventos.append({
         "escenario_id": reto["id_reto"],
@@ -422,13 +438,13 @@ def tarjeta_producto(producto: int) -> None:
             f"  </div>"
             f"</div>", unsafe_allow_html=True)
         st.button(info["nombre"], key=f"btn_{producto}", on_click=al_tocar_producto,
-                  args=(producto,), disabled=en_carrito, use_container_width=True)
+                  args=(producto,), disabled=en_carrito, width="stretch")
 
 def matriz_productos() -> None:
     visibles = st.session_state.productos_visibles
     for inicio in range(0, len(visibles), COLUMNAS_MATRIZ):
         cols = st.columns(COLUMNAS_MATRIZ, gap="large")
-        for col, producto in zip(cols, visibles[inicio:inicio + COLUMNAS_MATRIZ]):
+        for col, producto in zip(cols, visibles[inicio:inicio + COLUMNAS_MATRIZ], strict=False):
             with col:
                 tarjeta_producto(producto)
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
@@ -466,7 +482,7 @@ def pantalla_final(reto: dict) -> None:
                 f"<div class='fila'>{fotos}</div></div>", unsafe_allow_html=True)
     siguiente = (ss.reto_idx + 1) % len(RETOS)
     st.button("OTRA COMPRA", key="btn_siguiente", on_click=iniciar_reto,
-              args=(siguiente,), use_container_width=True)
+              args=(siguiente,), width="stretch")
 
 def panel_terapeuta() -> None:
     ss = st.session_state
@@ -487,6 +503,7 @@ st.markdown(css_dinamico(), unsafe_allow_html=True)
 
 reto_actual = RETOS[st.session_state.reto_idx]
 barra_superior(reto_actual)
+mostrar_apoyo_voz(st.session_state.mensaje)
 
 col_juego, col_lateral = st.columns([3.2, 1], gap="medium")
 
