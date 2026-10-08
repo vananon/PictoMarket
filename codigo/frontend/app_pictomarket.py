@@ -200,17 +200,17 @@ CSS_BASE = """
 .pm-frase { display: flex; gap: 8px; flex-wrap: wrap; }
 .pm-chip { background: var(--pista-suave); border: 3px solid var(--tinta); border-radius: 10px;
   padding: 4px 12px; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
-.pm-lista { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-.pm-mini { width: 84px; text-align: center; border: 3px solid var(--tinta); border-radius: 14px;
-  padding: 4px 4px; background: #fff; position: relative; }
-.pm-mini img { width: 56px; height: 56px; }
-.pm-mini .t { font-size: 13px; font-weight: 700; line-height: 1.1; }
+.pm-lista { display: flex; gap: 12px; flex-wrap: wrap; }
+.pm-mini { width: 100px; text-align: center; border: 3px solid var(--tinta); border-radius: 14px;
+  padding: 6px 6px; background: #fff; position: relative; }
+.pm-mini img { width: 80px; height: 80px; }
+.pm-mini .t { font-size: 15px; font-weight: 700; line-height: 1.1; }
 .pm-mini.hecho { background: var(--exito-suave); border-color: var(--exito); }
 .pm-mini.hecho img { opacity: .55; }
 .pm-mini.ahora { border-width: 5px; transform: scale(1.05); }
-.pm-mini .marca { position: absolute; top: -10px; right: -10px; font-size: 20px; }
+.pm-mini .marca { position: absolute; top: -10px; right: -10px; font-size: 24px; }
 .pm-mini .ahora-txt { position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-  background: var(--tinta); color: #fff !important; font-size: 11px; font-weight: 700;
+  background: var(--tinta); color: #fff !important; font-size: 13px; font-weight: 700;
   padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
 
 /* --- Burbuja del agente --- */
@@ -343,9 +343,8 @@ div[class*="st-key-card_"] div[class*="st-key-btn_"] button:disabled { cursor: d
   .pm-barra { padding: 14px 16px; gap: 12px; }
   .pm-logo { font-size: 22px; }
   .pm-chip { font-size: 20px; padding: 4px 10px; }
-  .pm-lista { margin-left: 0; }
-  .pm-mini { width: 92px; } .pm-mini img { width: 56px; height: 56px; }
-  .pm-mini .t { font-size: 12px; word-break: keep-all; }
+  .pm-mini { width: 96px; } .pm-mini img { width: 70px; height: 70px; }
+  .pm-mini .t { font-size: 14px; word-break: keep-all; }
   .pm-agente .ico { font-size: 34px; } .pm-agente .txt { font-size: 21px; }
   div[class*="st-key-card_"] { min-height: 240px; }
   .pm-card img { max-width: 160px; }
@@ -384,9 +383,15 @@ def html_monedas(cantidad: int, grande: bool = False) -> str:
     return "".join(f"<span class='{clase}'></span>" for _ in range(cantidad))
 
 def barra_superior(reto: dict) -> None:
+    chips = "".join(f"<span class='pm-chip'>{w}</span>" for w in palabras_objetivo(reto))
+    st.markdown(
+        f"<div class='pm-barra'><div class='pm-logo'>🛒 PICTOMARKET</div>"
+        f"<div class='pm-frase'>{chips}</div></div>",
+        unsafe_allow_html=True)
+
+def panel_lista_compras(reto: dict) -> None:
     ss = st.session_state
     obj = item_objetivo()
-    chips = "".join(f"<span class='pm-chip'>{w}</span>" for w in palabras_objetivo(reto))
     minis = []
     for p in reto["lista_correcta"]:
         hecho = p in ss.items_en_carrito
@@ -397,8 +402,7 @@ def barra_superior(reto: dict) -> None:
                      f"<img src='{url_pictograma(p)}' alt='{CATALOGO[p]['nombre']}'/>"
                      f"<div class='t'>{CATALOGO[p]['nombre']}</div></div>")
     st.markdown(
-        f"<div class='pm-barra'><div class='pm-logo'>🛒 PICTOMARKET</div>"
-        f"<div class='pm-frase'>{chips}</div>"
+        f"<div class='pm-panel'><h3>MI LISTA</h3>"
         f"<div class='pm-lista' role='list' aria-label='Lista de compras'>{''.join(minis)}</div></div>",
         unsafe_allow_html=True)
 
@@ -515,6 +519,7 @@ with col_juego:
         matriz_productos()
 
 with col_lateral:
+    panel_lista_compras(reto_actual)
     panel_billetera(reto_actual)
     panel_carrito()
     panel_terapeuta()
