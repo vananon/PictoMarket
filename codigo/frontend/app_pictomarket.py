@@ -55,7 +55,8 @@ def iniciar_reto(indice: int) -> None:
     ss.log_eventos = []
     ss.mensaje = {"tipo": "inicio",
                   "texto": f"¡HOLA! VAMOS A {' '.join(palabras_objetivo(reto))}. "
-                           f"BUSCA: {CATALOGO[ss.items_restantes[0]]['nombre']}"}
+                           f"BUSCA: {CATALOGO[ss.items_restantes[0]]['nombre']}",
+                  "hablar": True, "sonido": None, "id": time.time()}
 
 def estado_actual() -> dict:
     ss = st.session_state
@@ -119,7 +120,8 @@ def al_tocar_producto(producto: int) -> None:
         sig = item_objetivo()
         ss.mensaje = {"tipo": "exito",
                       "texto": f"¡MUY BIEN! {nombre} VA AL CARRITO."
-                               + (f" AHORA BUSCA: {CATALOGO[sig]['nombre']}" if sig else "")}
+                               + (f" AHORA BUSCA: {CATALOGO[sig]['nombre']}" if sig else ""),
+                      "hablar": True, "sonido": "exito", "id": time.time()}
     else:
         ss.intentos_fallidos += 1
         ss.errores_totales += 1
@@ -138,7 +140,7 @@ def al_tocar_producto(producto: int) -> None:
             "a2": f"QUITÉ UN PRODUCTO PARA AYUDARTE. ¡TÚ PUEDES!",
             "a3": f"MIRA 👉 AQUÍ ESTÁ {CATALOGO[objetivo]['nombre']}",
         }
-        ss.mensaje = {"tipo": "pista", "texto": textos[accion]}
+        ss.mensaje = {"tipo": "pista", "texto": textos[accion], "hablar": True, "sonido": "error", "id": time.time()}
 
     ss.log_eventos.append({
         "escenario_id": reto["id_reto"],
@@ -184,17 +186,17 @@ CSS_BASE = """
 .pm-frase { display: flex; gap: 8px; flex-wrap: wrap; }
 .pm-chip { background: var(--pista-suave); border: 3px solid var(--tinta); border-radius: 10px;
   padding: 4px 12px; font-size: 24px; font-weight: 700; letter-spacing: 1px; }
-.pm-lista { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-.pm-mini { width: 84px; text-align: center; border: 3px solid var(--tinta); border-radius: 14px;
-  padding: 4px 4px; background: #fff; position: relative; }
-.pm-mini img { width: 56px; height: 56px; }
-.pm-mini .t { font-size: 13px; font-weight: 700; line-height: 1.1; }
+.pm-lista { display: flex; gap: 12px; flex-wrap: wrap; }
+.pm-mini { width: 100px; text-align: center; border: 3px solid var(--tinta); border-radius: 14px;
+  padding: 6px 6px; background: #fff; position: relative; }
+.pm-mini img { width: 80px; height: 80px; }
+.pm-mini .t { font-size: 15px; font-weight: 700; line-height: 1.1; }
 .pm-mini.hecho { background: var(--exito-suave); border-color: var(--exito); }
 .pm-mini.hecho img { opacity: .55; }
 .pm-mini.ahora { border-width: 5px; transform: scale(1.05); }
-.pm-mini .marca { position: absolute; top: -10px; right: -10px; font-size: 20px; }
+.pm-mini .marca { position: absolute; top: -10px; right: -10px; font-size: 24px; }
 .pm-mini .ahora-txt { position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-  background: var(--tinta); color: #fff !important; font-size: 11px; font-weight: 700;
+  background: var(--tinta); color: #fff !important; font-size: 13px; font-weight: 700;
   padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
 
 /* --- Burbuja del agente --- */
@@ -327,9 +329,8 @@ div[class*="st-key-card_"] div[class*="st-key-btn_"] button:disabled { cursor: d
   .pm-barra { padding: 14px 16px; gap: 12px; }
   .pm-logo { font-size: 22px; }
   .pm-chip { font-size: 20px; padding: 4px 10px; }
-  .pm-lista { margin-left: 0; }
-  .pm-mini { width: 92px; } .pm-mini img { width: 56px; height: 56px; }
-  .pm-mini .t { font-size: 12px; word-break: keep-all; }
+  .pm-mini { width: 96px; } .pm-mini img { width: 70px; height: 70px; }
+  .pm-mini .t { font-size: 14px; word-break: keep-all; }
   .pm-agente .ico { font-size: 34px; } .pm-agente .txt { font-size: 21px; }
   div[class*="st-key-card_"] { min-height: 240px; }
   .pm-card img { max-width: 160px; }
@@ -368,9 +369,15 @@ def html_monedas(cantidad: int, grande: bool = False) -> str:
     return "".join(f"<span class='{clase}'></span>" for _ in range(cantidad))
 
 def barra_superior(reto: dict) -> None:
+    chips = "".join(f"<span class='pm-chip'>{w}</span>" for w in palabras_objetivo(reto))
+    st.markdown(
+        f"<div class='pm-barra'><div class='pm-logo'>🛒 PICTOMARKET</div>"
+        f"<div class='pm-frase'>{chips}</div></div>",
+        unsafe_allow_html=True)
+
+def panel_lista_compras(reto: dict) -> None:
     ss = st.session_state
     obj = item_objetivo()
-    chips = "".join(f"<span class='pm-chip'>{w}</span>" for w in palabras_objetivo(reto))
     minis = []
     for p in reto["lista_correcta"]:
         hecho = p in ss.items_en_carrito
@@ -381,8 +388,7 @@ def barra_superior(reto: dict) -> None:
                      f"<img src='{url_pictograma(p)}' alt='{CATALOGO[p]['nombre']}'/>"
                      f"<div class='t'>{CATALOGO[p]['nombre']}</div></div>")
     st.markdown(
-        f"<div class='pm-barra'><div class='pm-logo'>🛒 PICTOMARKET</div>"
-        f"<div class='pm-frase'>{chips}</div>"
+        f"<div class='pm-panel'><h3>MI LISTA</h3>"
         f"<div class='pm-lista' role='list' aria-label='Lista de compras'>{''.join(minis)}</div></div>",
         unsafe_allow_html=True)
 
@@ -498,6 +504,7 @@ with col_juego:
         matriz_productos()
 
 with col_lateral:
+    panel_lista_compras(reto_actual)
     panel_billetera(reto_actual)
     panel_carrito()
     panel_terapeuta()
@@ -505,3 +512,120 @@ with col_lateral:
 st.markdown("<p style='text-align:center;font-size:12px;margin-top:10px'>Pictogramas: Sergio Palao. "
             "Origen: ARASAAC (arasaac.org). Licencia CC BY-NC-SA. Propiedad: Gobierno de Aragón.</p>",
             unsafe_allow_html=True)
+
+def inyectar_js_audio():
+    import base64
+    import json
+    
+    ss = st.session_state
+    if "mensaje" not in ss:
+        return
+        
+    m = ss.mensaje
+    m_json = json.dumps({
+        "texto": m.get("texto", ""),
+        "hablar": m.get("hablar", False),
+        "sonido": m.get("sonido"),
+        "id": m.get("id", 0)
+    })
+    
+    raw_js = f"""
+    const win = window;
+    const doc = win.document;
+    const msg = {m_json};
+
+    function hablar(texto) {{
+        if ('speechSynthesis' in win) {{
+            win.speechSynthesis.cancel();
+            let u = new win.SpeechSynthesisUtterance(texto);
+            
+            let voices = win.speechSynthesis.getVoices();
+            let friendlyVoice = voices.find(v => v.name.includes("Google español") || v.name.includes("Google Spanish")) ||
+                                voices.find(v => (v.name.includes("Sabina") || v.name.includes("Paulina") || v.name.includes("Laura") || v.name.includes("Mia") || v.name.includes("Helena") || v.name.includes("Monica")) && v.lang.includes("es")) ||
+                                voices.find(v => v.lang.startsWith("es"));
+            
+            if (friendlyVoice) {{
+                u.voice = friendlyVoice;
+            }} else {{
+                u.lang = 'es-ES';
+            }}
+            
+            u.rate = 0.9;
+            u.pitch = 1.35; 
+            win.speechSynthesis.speak(u);
+        }}
+    }}
+
+    function playSuccessSound() {{
+        try {{
+            const ctx = new (win.AudioContext || win.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+            osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+            osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2);
+            osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.3);
+            
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+            
+            osc.start();
+            osc.stop(ctx.currentTime + 0.6);
+        }} catch (e) {{}}
+    }}
+
+    function playErrorSound() {{
+        try {{
+            const ctx = new (win.AudioContext || win.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(200, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+        }} catch (e) {{}}
+    }}
+
+    if (win.lastMsgId !== msg.id) {{
+        win.lastMsgId = msg.id;
+        
+        if (msg.sonido === "exito") playSuccessSound();
+        else if (msg.sonido === "error") playErrorSound();
+        
+        if (msg.hablar && msg.texto) {{
+            if (win.speechSynthesis.getVoices().length === 0) {{
+                win.speechSynthesis.onvoiceschanged = () => hablar(msg.texto);
+            }} else {{
+                setTimeout(() => hablar(msg.texto), msg.sonido ? 400 : 50);
+            }}
+        }}
+    }}
+
+    if (!win.hoverIntervalSet) {{
+        win.hoverIntervalSet = true;
+        setInterval(() => {{
+            const minis = doc.querySelectorAll('.pm-mini:not([data-hover-binded="true"])');
+            minis.forEach(el => {{
+                el.setAttribute("data-hover-binded", "true");
+                el.addEventListener('mouseenter', () => {{
+                    let texto = el.querySelector('.t')?.innerText;
+                    if (texto) hablar(texto);
+                }});
+            }});
+        }}, 1000);
+    }}
+    """
+    
+    b64 = base64.b64encode(raw_js.encode('utf-8')).decode('utf-8')
+    st.markdown(f'<img src="x" onerror="eval(atob(\'{b64}\'))" style="display:none;">', unsafe_allow_html=True)
+
+inyectar_js_audio()
